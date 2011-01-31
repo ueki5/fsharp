@@ -2,10 +2,11 @@
 // This sample code is provided "as is" without warranty of any kind. 
 // We disclaim all warranties, either express or implied, including the 
 // warranties of merchantability and fitness for a particular purpose. 
+#if INTERACTIVE
 #r "Microsoft.Office.Interop.Excel.dll"
+#endif
 
 open Microsoft.Office.Interop.Excel
-
 
 open System
 open System.Runtime.InteropServices // For COMException 
@@ -32,6 +33,7 @@ worksheet.Range("G1").Value2 <- 5
 // This sends a single dimension array to Excel 
 worksheet.Range("A1", "E1").Value2 <- [| for i in 0 .. 4 -> i * i |]
 worksheet.Range("A2", "E2").Value2 <- [| for i in 0 .. 4 -> sin (float i) |]
+worksheet.Range("A28", "E28").Value2 <- [| "項目１";"項目２";"項目３";"項目４";"項目５" |]
 
 // This sends a two dimension array to Excel 
 let array3 = Array2D.init 4 5 (fun i j -> i*10 + j) 
@@ -67,9 +69,12 @@ chartobject.Chart.ChartWizard(Source = range5,
                               Gallery = XlChartType .xl3DColumn,
                               PlotBy = XlRowCol.xlRows,
                               HasLegend = true,
-                              Title = "Sample Chart",
-                              CategoryTitle = "Sample Category Type",
-                              ValueTitle = "Sample Value Type")
+                              Title = "さんぷる図表",
+                              CategoryTitle = "さんぷるカテゴリ種",
+                              ValueTitle = "サンプル値種")
+//                               Title = "Sample Chart",
+//                               CategoryTitle = "Sample Category Type",
+//                               ValueTitle = "Sample Value Type")
 chartobject.Visible <- false
 chartobject.Visible <- true
 chartobject.Parent |> ignore
