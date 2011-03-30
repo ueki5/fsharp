@@ -1,3 +1,6 @@
+#if COMPILED
+module FileReader
+#endif
 // #if INTERACTIVE
 // #r "Microsoft.Office.Interop.Excel.dll"
 // #endif
@@ -9,21 +12,51 @@ open System
 open System.IO
 open System.Text
 
-let rec File2Line (filename:string) =
+let rec FileToLine (filename:string) =
     let r = new StreamReader(filename, Encoding.GetEncoding("Shift-JIS"))
-    let rec ReadLines (stream:StreamReader) (line:string) =
-        let newline = stream.ReadLine()
-        match newline with
-        | null -> line
-        | _    -> ReadLines stream (line + newline)
-    ReadLines r ""
+    r.ReadToEnd()
 let LineToList (line:string) =
-    let list = line.ToCharArray()
-               |> Array.toList
-    list
-// let rec ListToLines list line lines =
-//     match (list, line) with
-//     | ([], "") -> lines
-//     | ('\n'::cs) -> ListToLines cs 
-    
-// File2Lines "csv/List_Entity_Item.csv"
+    line.ToCharArray()
+    |> Array.toList
+type ReadStatus = Normal
+                | Quoted
+let ListToLines list =
+    let rec ListToLines' sta list line lines =
+        match (sta, list) with
+        | (Normal, []) -> if line = ""
+                            then lines
+                            else line::lines
+                          |> List.rev
+                          |> List.toArray
+        | (Normal, '\r'::'\n'::cs)
+        | (Normal, '\n'::cs) -> (ListToLines' Normal cs "" (line::lines))
+        | (Normal, '\"'::cs) -> (ListToLines' Quoted cs line lines)
+        | (Normal, c::cs) -> (ListToLines' Normal cs (line + string c) lines)
+        | (Quoted, '\"'::'\"'::cs) -> (ListToLines' Quoted cs (line + string '\"') lines)
+        | (Quoted, '\"'::cs) -> (ListToLines' Normal cs line lines)
+        | (Quoted, c::cs) -> (ListToLines' Quoted cs (line + string c) lines)
+        | (_, _) -> [|"Case is not match! line="; line|]
+    ListToLines' Normal list "" []
+let SplitToLines line =
+    line
+    |> LineToList
+    |> ListToLines
+let FileToLines =
+    FileToLine
+    >> LineToList
+    >> ListToLines
+let FileToArray filename =
+    let lines = FileToLines filename
+    List.toArray [ for line in lines -> line.Split([|','|])]
+
+// [<EntryPoint>]
+// let main (args : string[]) =
+//     let printarray arys =
+//         match arys with
+//         | [||] -> ()
+//         | _ -> (Array.iter (fun s -> printfn "%s" s) arys)
+//     match Array.length args with
+//     | 1 -> let arys = FileToArray args.[0]
+//            ignore <| Array.map printarray arys
+//            0
+//     | _ -> -1
