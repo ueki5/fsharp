@@ -1,7 +1,3 @@
-// Copyright (c) Microsoft Corporation 2005-2008.
-// This sample code is provided "as is" without warranty of any kind. 
-// We disclaim all warranties, either express or implied, including the 
-// warranties of merchantability and fitness for a particular purpose. 
 #if INTERACTIVE
 #r "Microsoft.Office.Interop.Excel.dll"
 #endif
@@ -12,19 +8,14 @@ open System
 open System.Runtime.InteropServices
 open System.IO
 
-//
 // Create new Excel.Application
 let app = new ApplicationClass(Visible = true) 
 let workbooks = app.Workbooks
 let workbook = workbooks.Add(XlWBATemplate.xlWBATWorksheet) 
 let sheets = workbook.Worksheets 
 let worksheet = (sheets.[box 1] :?> _Worksheet) 
-// Console.WriteLine ("Setting the value for cell")
 
-// This puts the value 5 to the cell
-// Console.WriteLine (List.head lines)
 let r = new StreamReader("csv/List_Entity_Item.csv",Encoding.GetEncoding("Shift-JIS")) ;;
-let 
 
 worksheet.Range("A1").Value2 <- line
 worksheet.Range("A2").Value2 <- "エンティティ物理名"

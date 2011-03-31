@@ -1,13 +1,7 @@
 #if COMPILED
 module FileReader
 #endif
-// #if INTERACTIVE
-// #r "Microsoft.Office.Interop.Excel.dll"
-// #endif
 
-// For COMException 
-// open Microsoft.Office.Interop.Excel
-// open System.Runtime.InteropServices
 open System
 open System.IO
 open System.Text
@@ -48,15 +42,3 @@ let FileToLines =
 let FileToArray filename =
     let lines = FileToLines filename
     List.toArray [ for line in lines -> line.Split([|','|])]
-
-// [<EntryPoint>]
-// let main (args : string[]) =
-//     let printarray arys =
-//         match arys with
-//         | [||] -> ()
-//         | _ -> (Array.iter (fun s -> printfn "%s" s) arys)
-//     match Array.length args with
-//     | 1 -> let arys = FileToArray args.[0]
-//            ignore <| Array.map printarray arys
-//            0
-//     | _ -> -1
