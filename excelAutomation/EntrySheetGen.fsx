@@ -55,17 +55,49 @@ let dicEntityIndex =
     |> MakeListEntityIndex
 let ProcessConditionItem =
     for conditem in dicConditionItem do
-        if dicCondition.ContainsKey(conditem.Value.ConditionId)
+        if dicCondition.ContainsKey(conditem.Value.ConditionPhysicalName)
         then
-            let cond = dicCondition.[conditem.Value.ConditionId]
+            let cond = dicCondition.[conditem.Value.ConditionPhysicalName]
             let _ = cond.ConditionItems.Add(conditem.Key, conditem.Value)
+            ()
+        else ()
+let ProcessItem =
+    for item in dicItem do
+        if dicCondition.ContainsKey(item.Value.ConditionPhysicalName)
+        then
+            let cond = dicCondition.[item.Value.ConditionPhysicalName]
+            ignore(item.Value.ConditionRef <- Some(cond))
             ()
         else ()
 let ProcessEntityItem =
     for entitem in dicEntityItem do
-        if dicEntity.ContainsKey(entitem.Value.EntPhysicalName)
+        if dicEntityIndex.ContainsKey(entitem.Key)
         then
-            let ent = dicEntity.[entitem.Value.EntPhysicalName]
+            let indexitem = dicEntityIndex.[entitem.Key]
+            ignore(entitem.Value.PkeyIndex <- Some(indexitem.ItemIndex))
+            ()
+        else ()
+        if dicItem.ContainsKey(entitem.Value.PhysicalName)
+        then
+            let item = dicItem.[entitem.Value.PhysicalName]
+            ignore(entitem.Value.ItemRef <- Some(item))
+            match item.ConditionRef with
+            | None -> ()
+            | Some cond -> ignore(entitem.Value.ConditionRef <- Some(cond))
+            ()
+        else ()
+        match entitem.Value.ConditionRef with
+        | None ->
+            if dicCondition.ContainsKey(entitem.Value.ConditionPhysicalName)
+            then
+                let cond = dicCondition.[entitem.Value.ConditionPhysicalName]
+                ignore(entitem.Value.ConditionRef <- Some(cond))
+                ()
+            else ()
+        | Some _ -> ()
+        if dicEntity.ContainsKey(entitem.Value.EntityPhysicalName)
+        then
+            let ent = dicEntity.[entitem.Value.EntityPhysicalName]
             let _ = ent.EntityItems.Add(entitem.Key, entitem.Value)
             ()
         else ()
@@ -78,8 +110,8 @@ let CreateExcel (ent:Entity) =
     let worksheet = (sheets.[box 1] :?> _Worksheet)
 
 
-    for item in ent.EntityItems.Values do
-        match item.PhysicalName with
+    for entitem in ent.EntityItems.Values do
+        match entitem.PhysicalName with
         | "X_INS_DATETIME"
         | "X_INS_USER_ID"
         | "X_INS_CLIENT_IP"
@@ -96,11 +128,73 @@ let CreateExcel (ent:Entity) =
         | "B_UPD_APSERVER_IP"
         | "B_UPD_PG_ID" -> ()
         | _ -> 
-            worksheet.Range("CELL_ITEM_LOGICAL_NAME").Value2 <- item.LogicalName
-            worksheet.Range("CELL_ITEM_PHYSICAL_NAME").Value2 <- item.PhysicalName
-            worksheet.Range("CELL_ITEM_REMARKS").Value2 <- item.Remarks
+            let ColorIndexBk = worksheet.Range("CELL_ITEM_VALUE").Interior.ColorIndex
+            worksheet.Range("CELL_ITEM_LOGICAL_NAME").Value2 <- entitem.LogicalName
+            worksheet.Range("CELL_ITEM_PHYSICAL_NAME").Value2 <- entitem.PhysicalName
+            worksheet.Range("CELL_ITEM_REMARKS").Value2 <- entitem.Remarks
+            match entitem.ItemRef with
+            | None -> ()
+            | Some itemref ->
+                worksheet.Range("CELL_ITEM_DATA_TYPE").Value2 <- itemref.DataType
+                worksheet.Range("CELL_ITEM_DATA_LENGTH").Value2 <- itemref.DataLengthDsp
+                worksheet.Range("CELL_ITEM_VALUE").NumberFormatLocal <- itemref.NumberFormat
+                worksheet.Range("COL_COLUMN").ColumnWidth <- itemref.ColumnWidth
+                // worksheet.Range("COL_COLUMN").EntireColumn.AutoFit()
+                // if itemref.ColumnWidth > worksheet.Range("COL_COLUMN").ColumnWidth
+                // then worksheet.Range("COL_COLUMN").ColumnWidth <- itemref.ColumnWidth
+                // else ()
+
+                let validation = worksheet.Range("CELL_ITEM_VALUE").Validation
+                ignore(validation.Delete())
+                ignore <| match (itemref.DataType, itemref.ConditionRef) with
+                            | (_ , Some(cond)) ->
+                                // worksheet.Range("CELL_ITEM_VALUE").Value2 <- (GetDropDownList cond.ConditionItems)
+                                // validation.Add(XlDVType.xlValidateInputOnly)
+                                validation.Add(
+                                    XlDVType.xlValidateList
+                                    , XlDVAlertStyle.xlValidAlertStop
+                                    , XlFormatConditionOperator.xlBetween
+                                    // , "1:新規,2:変更,3:削除,4:照会")
+                                    , (GetDropDownList cond.ConditionItems))
+                                validation.IMEMode <- int XlIMEMode.xlIMEModeOff
+                            | ("NUMBER", None) ->
+                                validation.Add(
+                                    XlDVType.xlValidateDecimal
+                                    , XlDVAlertStyle.xlValidAlertStop
+                                    , XlFormatConditionOperator.xlBetween
+                                    , itemref.NumberFormatMin
+                                    , itemref.NumberFormatMax)
+                                validation.IMEMode <- int XlIMEMode.xlIMEModeOff
+                            | ("CHAR", None) -> 
+                                validation.Add(
+                                    XlDVType.xlValidateCustom
+                                    , XlDVAlertStyle.xlValidAlertStop
+                                    , XlFormatConditionOperator.xlBetween
+                                    , "=LENB(A9)" + itemref.ValidationCusmomOperator + "A$7")
+                                validation.IMEMode <- int XlIMEMode.xlIMEModeOff
+                            | ("VARCHAR2", None) ->
+                                validation.Add(
+                                    XlDVType.xlValidateCustom
+                                    , XlDVAlertStyle.xlValidAlertStop
+                                    , XlFormatConditionOperator.xlBetween
+                                    , "=LENB(A9)" + itemref.ValidationCusmomOperator + "A$7")
+                                validation.IMEMode <- int XlIMEMode.xlIMEModeOn
+                            | _ -> ()
+                validation.IgnoreBlank <- true
+                validation.InCellDropdown <- true
+                validation.InputTitle <- ""
+                validation.ErrorTitle <- ""
+                validation.InputMessage <- ""
+                validation.ErrorMessage <- ""
+                validation.ShowInput <- true
+                validation.ShowError <- true
+            match entitem.PkeyIndex with
+            | None -> ()
+            | Some pkeyindex -> 
+                worksheet.Range("CELL_ITEM_VALUE").Interior.ColorIndex <- 38
             ignore <| worksheet.Range("COL_COLUMN").Copy()
             ignore <| worksheet.Range("COL_INSERTAT").Insert(XlDirection.xlToRight)
+            ignore <| worksheet.Range("CELL_ITEM_VALUE").Interior.ColorIndex <- ColorIndexBk
     ignore <| worksheet.Range("COL_COLUMN").Delete()
     ignore <| worksheet.Range("COL_INSERTAT").Delete()
     ignore <| worksheet.Range(Cell (1,1)).Value2 <- ent.PhysicalName
@@ -113,7 +207,9 @@ let MakeDirectory dirpath =
     then Directory.Delete(dirpath,true)
     else ()
     Directory.CreateDirectory(dirpath)
+#if COMPILED
 [<EntryPoint>]
+#endif
 let main (_) =
     ignore <| MakeDirectory(outDir)
     ignore <| ProcessConditionItem
@@ -121,6 +217,9 @@ let main (_) =
     for ent in dicEntity.Values do
         CreateExcel ent
     0
+#if INTERACTIVE
+main
+#endif
 // #if COMPILED
 // System.Threading.Thread.Sleep(1000)
 // //  If user interacted with Excel it will not close when the app object is destroyed, so we close it explicitly 

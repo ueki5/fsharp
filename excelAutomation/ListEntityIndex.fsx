@@ -9,8 +9,8 @@ open System
 open System.Collections.Generic
 
 type EntityIndex = {
-    EntPhysicalName:string
-   ;EntLogicalName:string
+    EntityPhysicalName:string
+   ;EntityLogicalName:string
    ;IdxPhysicalName:string
    ;IdxLogicalName:string
    ;IdxType:string
@@ -26,8 +26,8 @@ type EntityIndex = {
 let MakeListEntityIndex (ary2d:string[][]) =
     let objTbl = new Dictionary<string * string, EntityIndex>()
     let MakeObject (ary:string []) = {
-            EntPhysicalName = ary.[0]
-            EntLogicalName = ary.[1]
+            EntityPhysicalName = ary.[0]
+            EntityLogicalName = ary.[1]
             IdxPhysicalName = ary.[2]
             IdxLogicalName = ary.[3]
             IdxType = ary.[4]
@@ -48,6 +48,6 @@ let MakeListEntityIndex (ary2d:string[][]) =
         let objAry = Array.map MakeObject ary2d'
         for obj in objAry do
             match obj.IdxType with
-            | "PK" -> objTbl.Add((obj.EntPhysicalName, obj.EntItemPhysicalName), obj)
+            | "PK" -> objTbl.Add((obj.EntityPhysicalName, obj.EntItemPhysicalName), obj)
             | _    -> ()
         objTbl

@@ -13,8 +13,8 @@ open FileReader
 open ListConditionItem
 
 type Condition = {
-    ConditionId:string;
-    ConditionName:string;
+    ConditionPhysicalName:string;
+    ConditionLogicalName:string;
     FixedItemPosition:string;
     FixedItemValue:string;
     FixedItemLable:string;
@@ -23,7 +23,7 @@ type Condition = {
     InsDate:string;
     UpdID:string;
     UpdDate:string;
-    ConditionItems:ConditionItemDictionary
+    ConditionItems:ConditionItemDictionary;
     }
 
 type ConditionDictionary = Dictionary<string, Condition>
@@ -33,8 +33,8 @@ let MakeListCondition (ary2d:string[][]) =
                          | (true, n) -> n
     let objTbl = new ConditionDictionary()
     let MakeObject (ary:string []) = {
-        ConditionId = ary.[0]
-        ConditionName = ary.[1]
+        ConditionPhysicalName = ary.[0]
+        ConditionLogicalName = ary.[1]
         FixedItemPosition = ary.[2]
         FixedItemValue = ary.[3]
         FixedItemLable = ary.[4]
@@ -53,5 +53,14 @@ let MakeListCondition (ary2d:string[][]) =
         let ary2d' = ary2d.[1..]
         let objAry = Array.map MakeObject ary2d'
         for obj in objAry do
-            objTbl.Add(obj.ConditionId, obj)
+            objTbl.Add(obj.ConditionPhysicalName, obj)
         objTbl
+let GetDropDownList (condItems:ConditionItemDictionary) =
+    let mutable s = ""
+    for cond in condItems do
+        match s with
+        | "" ->
+            s <- cond.Value.ConditionValue + ":" + cond.Value.ConditionLabel
+        | _ ->
+            s <- s + "," + cond.Value.ConditionValue + ":" + cond.Value.ConditionLabel
+    s

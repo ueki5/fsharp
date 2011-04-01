@@ -11,8 +11,8 @@ open System
 open System.Collections.Generic
 
 type ConditionItem = {
-     ConditionId:string
-    ;ConditionName:string
+     ConditionPhysicalName:string
+    ;ConditionLogicalName:string
     ;ItemIndex:int
     ;ConditionItemId:string
     ;ConditionValue:string
@@ -30,8 +30,8 @@ let MakeListConditionItem (ary2d:string[][]) =
                          | (true, n) -> n
     let objTbl = new ConditionItemDictionary()
     let MakeObject (ary:string []) = {
-        ConditionId = ary.[0]
-        ConditionName = ary.[1]
+        ConditionPhysicalName = ary.[0]
+        ConditionLogicalName = ary.[1]
         ItemIndex = TryInt ary.[2]
         ConditionItemId = ary.[3]
         ConditionValue = ary.[4]
@@ -49,5 +49,5 @@ let MakeListConditionItem (ary2d:string[][]) =
         let ary2d' = ary2d.[1..]
         let objAry = Array.map MakeObject ary2d'
         for obj in objAry do
-            objTbl.Add((obj.ConditionId, obj.ConditionItemId), obj)
+            objTbl.Add((obj.ConditionPhysicalName, obj.ConditionItemId), obj)
         objTbl
