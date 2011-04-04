@@ -101,6 +101,23 @@ let ProcessEntityItem =
             let _ = ent.EntityItems.Add(entitem.Key, entitem.Value)
             ()
         else ()
+let ReNumberEntityItem =
+    // 一般の項目が前に、共通項目が後になるよう、番号を振り直す。
+    for ent in dicEntity.Values do
+        let mutable idx = 0
+        for entitem in ent.EntityItems.Values do
+            match IsCommonItem entitem.PhysicalName with
+            | false ->
+                idx <- idx + 1
+                entitem.ItemIndex <- idx
+            | true -> ()
+        for entitem in ent.EntityItems.Values do
+            match IsCommonItem entitem.PhysicalName with
+            | false -> ()
+            | true ->
+                idx <- idx + 1
+                entitem.ItemIndex <- idx
+    ()
 let CreateExcel (ent:Entity) = 
     let app = new ApplicationClass(Visible = false) 
     app.DisplayAlerts <- false
@@ -172,10 +189,18 @@ let CreateExcel (ent:Entity) =
                 validation.ErrorMessage <- ""
                 validation.ShowInput <- true
                 validation.ShowError <- true
-            match entitem.PkeyIndex with
-            | None -> ()
-            | Some pkeyindex -> 
-                worksheet.Range("CELL_ITEM_VALUE").Interior.ColorIndex <- 38
+                // printfn "%s,%s,%s" ent.PhysicalName entitem.PhysicalName entitem.NotNull
+                match entitem.PkeyIndex with
+                | None ->
+                    match entitem.NotNull with
+                    | "true"
+                    | "TRUE" ->
+                        worksheet.Range("CELL_ITEM_VALUE").Interior.ColorIndex <- 6
+                        validation.InputMessage <- "必須項目です。"
+                    | _ -> ()
+                | Some pkeyindex ->
+                    worksheet.Range("CELL_ITEM_VALUE").Interior.ColorIndex <- 38
+                    validation.InputMessage <- "キー項目です。"
             ignore <| worksheet.Range("COL_COLUMN").Copy()
             ignore <| worksheet.Range("COL_INSERTAT").Insert(XlDirection.xlToRight)
             ignore <| worksheet.Range("CELL_ITEM_VALUE").Interior.ColorIndex <- ColorIndexBk
@@ -198,11 +223,12 @@ let CreateExcel (ent:Entity) =
     worksheet.Range(Cell (6,2)).Value2 <- "SQL"
     worksheet.Range(Cell (GetSqlPos ent 0)).Value2 <- (GetInsertSql1 ent)
     worksheet.Range(Cell (GetSqlPos ent 1)).Value2 <- (GetInsertSql2 ent)
+    let mutable idx = 0
     for entitem in ent.EntityItems.Values do
-        // printfn "%s" ("=" + (GetSqlValue entitem) + " & \",\" & " + Cell (GetSqlPos ent (2 + entitem.ItemIndex)))
-        match entitem.ItemIndex < ent.EntityItems.Count with
-        | true -> worksheet.Range(Cell (GetSqlPos ent (1 + entitem.ItemIndex))).Value2 <- "=" + (GetSqlValue entitem) + " & \",\" & " + Cell (GetSqlPos ent (2 + entitem.ItemIndex))
-        | false -> worksheet.Range(Cell (GetSqlPos ent (1 + entitem.ItemIndex))).Value2 <- "=" + (GetSqlValue entitem)
+        idx <- idx + 1
+        match idx < ent.EntityItems.Count with
+        | true -> worksheet.Range(Cell (GetSqlPos ent (idx + 1))).Value2 <- "=" + (GetSqlValue entitem) + " & \",\" & " + Cell (GetSqlPos ent (idx + 2))
+        | false -> worksheet.Range(Cell (GetSqlPos ent (idx + 1))).Value2 <- "=" + (GetSqlValue entitem)
     workbook.SaveAs(outDir + "\\" + ent.PhysicalName + "("+ ent.LogicalName + ")" + ".xls")
     app.UserControl <- false
     app.Quit()
@@ -218,6 +244,7 @@ let main (_) =
     ignore <| MakeDirectory(outDir)
     ignore <| ProcessConditionItem
     ignore <| ProcessEntityItem
+    ignore <| ReNumberEntityItem
     for ent in dicEntity.Values do
         match (IsTarget ent) with
         | true ->

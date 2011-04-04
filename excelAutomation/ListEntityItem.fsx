@@ -19,7 +19,7 @@ open ListItem
 type EntityItem = {
     EntityPhysicalName:string
     ;EntityLogicalName:string
-    ;ItemIndex:int
+    ;mutable ItemIndex:int
     ;mutable PkeyIndex:(int option)
     ;PhysicalName:string
     ;LogicalName:string
