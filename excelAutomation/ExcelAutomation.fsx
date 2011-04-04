@@ -11,6 +11,12 @@ open System
 open System.IO
 //open System.Runtime.InteropServices
 
+let CommonColumnCount = 15 - 1
+let CommonColumnOffset = 1
+let CommonRow = 2
+let InputColumnOffset = 0
+let InputRow = 9
+
 let NumToAlph n =
     match n with
     |  0 -> "A"

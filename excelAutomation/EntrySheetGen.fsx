@@ -109,25 +109,11 @@ let CreateExcel (ent:Entity) =
     let sheets = workbook.Worksheets
     let worksheet = (sheets.[box 1] :?> _Worksheet)
 
-
+    worksheet.Name <- ent.PhysicalName
     for entitem in ent.EntityItems.Values do
-        match entitem.PhysicalName with
-        | "X_INS_DATETIME"
-        | "X_INS_USER_ID"
-        | "X_INS_CLIENT_IP"
-        | "X_INS_APSERVER_IP"
-        | "X_INS_PG_ID"
-        | "D_UPD_DATETIME"
-        | "D_UPD_USER_ID"
-        | "D_UPD_CLIENT_IP"
-        | "D_UPD_APSERVER_IP"
-        | "D_UPD_PG_ID"
-        | "B_UPD_DATETIME"
-        | "B_UPD_USER_ID"
-        | "B_UPD_CLIENT_IP"
-        | "B_UPD_APSERVER_IP"
-        | "B_UPD_PG_ID" -> ()
-        | _ -> 
+        match IsCommonItem(entitem.PhysicalName) with
+        | true     -> ()
+        | false    -> 
             let ColorIndexBk = worksheet.Range("CELL_ITEM_VALUE").Interior.ColorIndex
             worksheet.Range("CELL_ITEM_LOGICAL_NAME").Value2 <- entitem.LogicalName
             worksheet.Range("CELL_ITEM_PHYSICAL_NAME").Value2 <- entitem.PhysicalName
@@ -138,6 +124,7 @@ let CreateExcel (ent:Entity) =
                 worksheet.Range("CELL_ITEM_DATA_TYPE").Value2 <- itemref.DataType
                 worksheet.Range("CELL_ITEM_DATA_LENGTH").Value2 <- itemref.DataLengthDsp
                 worksheet.Range("CELL_ITEM_VALUE").NumberFormatLocal <- itemref.NumberFormat
+                // printfn "type=%s,len1=%d,len2=%d,format=%s" itemref.DataType itemref.DataLength1 itemref.DataLength2 itemref.NumberFormat
                 worksheet.Range("COL_COLUMN").ColumnWidth <- itemref.ColumnWidth
                 // worksheet.Range("COL_COLUMN").EntireColumn.AutoFit()
                 // if itemref.ColumnWidth > worksheet.Range("COL_COLUMN").ColumnWidth
@@ -148,13 +135,10 @@ let CreateExcel (ent:Entity) =
                 ignore(validation.Delete())
                 ignore <| match (itemref.DataType, itemref.ConditionRef) with
                             | (_ , Some(cond)) ->
-                                // worksheet.Range("CELL_ITEM_VALUE").Value2 <- (GetDropDownList cond.ConditionItems)
-                                // validation.Add(XlDVType.xlValidateInputOnly)
                                 validation.Add(
                                     XlDVType.xlValidateList
                                     , XlDVAlertStyle.xlValidAlertStop
                                     , XlFormatConditionOperator.xlBetween
-                                    // , "1:新規,2:変更,3:削除,4:照会")
                                     , (GetDropDownList cond.ConditionItems))
                                 validation.IMEMode <- int XlIMEMode.xlIMEModeOff
                             | ("NUMBER", None) ->
@@ -197,8 +181,28 @@ let CreateExcel (ent:Entity) =
             ignore <| worksheet.Range("CELL_ITEM_VALUE").Interior.ColorIndex <- ColorIndexBk
     ignore <| worksheet.Range("COL_COLUMN").Delete()
     ignore <| worksheet.Range("COL_INSERTAT").Delete()
-    ignore <| worksheet.Range(Cell (1,1)).Value2 <- ent.PhysicalName
-    ignore <| worksheet.Range(Cell (1,2)).Value2 <- ent.LogicalName
+    // printfn "%s" (GetInsertSql1 ent)
+    // printfn "%s" (GetInsertSql2 ent)
+    worksheet.Range(Cell (1,1)).Value2 <- ent.PhysicalName
+    worksheet.Range(Cell (1,2)).Value2 <- ent.LogicalName
+    worksheet.Range(Cell (1,2)).Value2 <- ent.LogicalName
+    worksheet.Range(Cell (2,1)).Value2 <- "日時"
+    worksheet.Range(Cell (3,1)).Value2 <- "ユーザＩＤ"
+    worksheet.Range(Cell (4,1)).Value2 <- "クライアントＩＰ"
+    worksheet.Range(Cell (5,1)).Value2 <- "アプリサーバＩＰ"
+    worksheet.Range(Cell (6,1)).Value2 <- "プログラムＩＤ"
+    worksheet.Range(Cell (2,2)).Value2 <- "ZPK_DBINFO.GET_DATETIME"
+    worksheet.Range(Cell (3,2)).Value2 <- "SETUP"
+    worksheet.Range(Cell (4,2)).Value2 <- "ZPK_DBINFO.GET_IPADDR"
+    worksheet.Range(Cell (5,2)).Value2 <- "ZPK_DBINFO.GET_IPADDR"
+    worksheet.Range(Cell (6,2)).Value2 <- "SQL"
+    worksheet.Range(Cell (GetSqlPos ent 0)).Value2 <- (GetInsertSql1 ent)
+    worksheet.Range(Cell (GetSqlPos ent 1)).Value2 <- (GetInsertSql2 ent)
+    for entitem in ent.EntityItems.Values do
+        // printfn "%s" ("=" + (GetSqlValue entitem) + " & \",\" & " + Cell (GetSqlPos ent (2 + entitem.ItemIndex)))
+        match entitem.ItemIndex < ent.EntityItems.Count with
+        | true -> worksheet.Range(Cell (GetSqlPos ent (1 + entitem.ItemIndex))).Value2 <- "=" + (GetSqlValue entitem) + " & \",\" & " + Cell (GetSqlPos ent (2 + entitem.ItemIndex))
+        | false -> worksheet.Range(Cell (GetSqlPos ent (1 + entitem.ItemIndex))).Value2 <- "=" + (GetSqlValue entitem)
     workbook.SaveAs(outDir + "\\" + ent.PhysicalName + "("+ ent.LogicalName + ")" + ".xls")
     app.UserControl <- false
     app.Quit()
@@ -215,7 +219,12 @@ let main (_) =
     ignore <| ProcessConditionItem
     ignore <| ProcessEntityItem
     for ent in dicEntity.Values do
-        CreateExcel ent
+        match (IsTarget ent) with
+        | true ->
+            printfn "エンティティ[%s]を処理中…" ent.PhysicalName
+            CreateExcel ent
+        | false ->
+            printfn "エンティティ[%s]をスキップしました。" ent.PhysicalName
     0
 #if INTERACTIVE
 main

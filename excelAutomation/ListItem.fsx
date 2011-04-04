@@ -13,6 +13,16 @@ open FileReader
 open ListCondition
 open ListConditionItem
 
+let GetNumberFormat (len1:int) (len2:int) (s:string) =
+    if len2 > 0 && len1 > len2
+    then (String.replicate (len1 - len2) s) + "." + (String.replicate len2 s)
+    else (String.replicate len1 s)
+let EndWith src chk =
+    let srclen = String.length src
+    let chklen = String.length chk
+    match (chklen > 0) && (srclen > chklen) with
+    | true -> src.[(srclen - chklen) .. srclen - 1] = chk
+    | false -> false
 type Item = {
     PhysicalName:string
     ;LogicalName:string
@@ -50,7 +60,6 @@ let MakeListItem (ary2d:string[][]) =
         DataLengthDsp = ""
         ColumnWidth = 0
         ValidationCusmomOperator = ""
-        // DataLengthDsp = LengthPairToString (TryInt ary.[5]) (TryInt ary.[6])
         NumberFormat = ""
         NumberFormatMin = ""
         NumberFormatMax = ""
@@ -69,22 +78,15 @@ let MakeListItem (ary2d:string[][]) =
     let GetValidationCusmomOperator (item:Item) =
         match item.DataType with
         | "CHAR" -> "="
+        // | "CHAR" ->
+        //     match (EndWith item.PhysicalName "_CD") || (EndWith item.PhysicalName "_KBN") || (EndWith item.PhysicalName "_BI" && item.DataLength1 = 8)  || (EndWith item.PhysicalName "_YMD" && item.DataLength1 = 8) with
+        //     | true -> "="
+        //     | false -> "<="
         | "VARCHAR2" -> "<="
         | _ -> ""
-    let Padding (s:string) (len:int) =
-        let mutable out = ""
-        if len > 0
-        then for i = 1 to len do
-             out <- out + s
-        else out <- ""
-        out
-    let GetNumberFormat (len1:int) (len2:int) (s:string) =
-        if len2 > 0 && len1 > len2 && len1 >= 0
-        then (Padding s (len1 - len2)) + "." + (Padding s len2)
-        else (Padding s len1)
     let GetFormat(item:Item) =
         match item.DataType with
-        | "NUMBER" -> (GetNumberFormat 1 item.DataLength2 "0") + "_ "
+        | "NUMBER" -> (GetNumberFormat (item.DataLength2 + 1) item.DataLength2 "0") + "_ "
         | "CHAR" -> "@"
         | "VARCHAR2" -> "@"
         | _ -> ""

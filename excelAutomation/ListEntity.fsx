@@ -1,5 +1,6 @@
 #if INTERACTIVE
 #load "QuiQPro.fsx"
+#load "ExcelAutomation.fsx"
 #load "FileReader.fsx"
 #load "ListEntityItem.fsx"
 #endif
@@ -9,6 +10,7 @@ module ListEntity
 open System
 open System.Collections.Generic
 open QuiQPro
+open ExcelAutomation
 open FileReader
 open ListEntityItem
 
@@ -45,3 +47,20 @@ let MakeListEntity (ary2d:string[][]) =
         for obj in objAry do
             objTbl.Add(obj.PhysicalName, obj)
         objTbl
+let entityitems (entity:Entity) = 
+    let mutable entityitems' = ""
+    for entitem in entity.EntityItems do
+        ignore <| entityitems' <- AppendWith entityitems' "," (entitem.Value.PhysicalName)
+    entityitems'
+let itemvalues (entity:Entity) = 
+    let mutable values' = ""
+    for entitem in entity.EntityItems do
+        ignore <| values'<- AppendWith values' "," (GetSqlValue entitem.Value)
+    values'
+let GetSqlPos (entity:Entity) offset =
+    match entity.EntityItems.Count <= CommonColumnCount with
+    | true  -> (1 + offset , InputRow)
+    | false -> (InputColumnOffset + entity.EntityItems.Count - CommonColumnCount + offset, InputRow)
+let GetInsertSql1 (entity:Entity) = "=\"INSERT INTO " + entity.PhysicalName + "(\" & " + (Cell (GetSqlPos entity 1)) + " & \") VALUES(\" & " + (Cell (GetSqlPos entity 2)) + "& \");\""
+let GetInsertSql2 (entity:Entity) = entityitems entity
+let IsTarget (entity:Entity) = (String.length entity.PhysicalName > 3) && (entity.PhysicalName.[0..2] <> "ZV_")

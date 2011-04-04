@@ -16,3 +16,8 @@ let CnvDateType s = match s with
                     | "N" -> "VARCHAR2"
                     | _   -> ""
 
+let AppendWith s1 delim s2 =
+    match s1 with
+    | "" -> s2
+    | _  -> s1 + delim + s2
+let WrapWith (s:string) (wrap:string) = "\"" + wrap + "\" & " + s + " & \"" + wrap + "\""
