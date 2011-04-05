@@ -17,6 +17,12 @@ let GetNumberFormat (len1:int) (len2:int) (s:string) =
     if len2 > 0 && len1 > len2
     then (String.replicate (len1 - len2) s) + "." + (String.replicate len2 s)
     else (String.replicate len1 s)
+let StartWith src chk =
+    let srclen = String.length src
+    let chklen = String.length chk
+    match (chklen > 0) && (srclen > chklen) with
+    | true -> src.[1  .. srclen] = chk
+    | false -> false
 let EndWith src chk =
     let srclen = String.length src
     let chklen = String.length chk
@@ -32,7 +38,7 @@ type Item = {
     ;DataLength1:int
     ;DataLength2:int
     ;DataLengthDsp:string
-    ;ColumnWidth:int
+    ;ColumnWidth:float
     ;ValidationCusmomOperator:string
     ;NumberFormat:string
     ;NumberFormatMin:string
@@ -47,8 +53,9 @@ type Item = {
     ;UpdDate:string
     }
     
+type ItemDictionary = Dictionary<string,Item>
 let MakeListItem (ary2d:string[][]) =
-    let objTbl = new Dictionary<string, Item>()
+    let objTbl = new ItemDictionary()
     let MakeObject' (ary:string []) =  {
         PhysicalName = ary.[0]
         LogicalName = ary.[1]
@@ -58,7 +65,7 @@ let MakeListItem (ary2d:string[][]) =
         DataLength1 = TryInt ary.[5]
         DataLength2 = TryInt ary.[6]
         DataLengthDsp = ""
-        ColumnWidth = 0
+        ColumnWidth = 0.0
         ValidationCusmomOperator = ""
         NumberFormat = ""
         NumberFormatMin = ""
@@ -71,22 +78,89 @@ let MakeListItem (ary2d:string[][]) =
         InsDate = ary.[11]
         UpdID = ary.[12]
         UpdDate = ary.[13]}
-    let GetColumnWidth (len:int) =
-        if len < 10 then 10
-        elif len <= 40 then len
-        else 40
+    let GetColumnWidth (len:float) =
+        if len < 10.0 then 10.0
+        elif len <= 40.0 then len
+        else 40.0
     let GetValidationCusmomOperator (item:Item) =
         match item.DataType with
-        | "CHAR" -> "="
-        // | "CHAR" ->
-        //     match (EndWith item.PhysicalName "_CD") || (EndWith item.PhysicalName "_KBN") || (EndWith item.PhysicalName "_BI" && item.DataLength1 = 8)  || (EndWith item.PhysicalName "_YMD" && item.DataLength1 = 8) with
-        //     | true -> "="
-        //     | false -> "<="
+        // | "CHAR" -> "="
+        | "CHAR" ->
+            if
+                  (item.DomainPhysicalName <> "SHN_CD")
+                  && (not (item.PhysicalName.Contains "SHN_CD") || item.DataLength1 <> 4)
+                  && (item.DomainPhysicalName <> "TORIHIKI_ZYOUKEN_CD")
+                  && (not (item.PhysicalName.Contains "TORIHIKI_ZYOUKEN_CD") || item.DataLength1 <> 4)
+                  && (not (item.PhysicalName.Contains "ZIHANKI_BAIKA_ZYOUKEN_CD") || item.DataLength1 <> 4)
+                  && ((item.PhysicalName.EndsWith "_CD")
+                      || (item.PhysicalName.EndsWith "_KBN")
+                      || (item.PhysicalName.EndsWith "_BI" && item.DataLength1 = 8)
+                      || (item.PhysicalName.EndsWith "_YMD" && item.DataLength1 = 8)
+                      || (item.PhysicalName.EndsWith "_HIDUKE" && item.DataLength1 = 8)
+                      || (item.PhysicalName.Contains "_BI_" && item.DataLength1 = 8)
+                      || (item.PhysicalName.Contains "_YMD_" && item.DataLength1 = 8)
+                      || (item.PhysicalName.Contains "_HIDUKE_" && item.DataLength1 = 8)
+                      || (item.DomainPhysicalName = "YYYYMMDD")
+                      || (item.DomainPhysicalName = "YYYYMM")
+                      || (item.DomainPhysicalName = "YYYY")
+                      || (item.DomainPhysicalName = "YY")
+                      || (item.DomainPhysicalName = "MM")
+                      || (item.DomainPhysicalName = "DD")
+                      || (item.DomainPhysicalName.StartsWith "DATETIME"))
+            then "="
+            else "<="
         | "VARCHAR2" -> "<="
         | _ -> ""
     let GetFormat(item:Item) =
         match item.DataType with
-        | "NUMBER" -> (GetNumberFormat (item.DataLength2 + 1) item.DataLength2 "0") + "_ "
+        | "NUMBER" ->
+            if item.DomainPhysicalName.StartsWith "KINGAKU"
+               || item.DomainPhysicalName = "TANKA"
+               || (item.PhysicalName.Contains "_KINGAKU" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_KIN8" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_KIN10" && item.DataLength1 = 10 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_KIN12" && item.DataLength1 = 12 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_KIN15" && item.DataLength1 = 15 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_ZAN8" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_ZAN10" && item.DataLength1 = 10 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_ZAN12" && item.DataLength1 = 12 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_ZAN15" && item.DataLength1 = 15 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_TAX" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_TAX" && item.DataLength1 = 10 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_TAX" && item.DataLength1 = 12 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_TAX" && item.DataLength1 = 15 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_ZANDAKA" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_ZANDAKA" && item.DataLength1 = 10 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_ZANDAKA" && item.DataLength1 = 12 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_ZANDAKA" && item.DataLength1 = 15 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_HIYOU" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_HIYOU" && item.DataLength1 = 10 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_HIYOU" && item.DataLength1 = 12 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_HIYOU" && item.DataLength1 = 15 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_RYOUKIN" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "BUHINDAI" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "SHNDAI" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "BUZAI" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_GETUGAKU" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_SOUGAKU" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_KOURYOU" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "_KAKAKU" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "TESURYOU" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "DENKIRYOU" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "SIYOURYOU" && item.DataLength1 = 8 && item.DataLength2 = 0)
+               || (item.PhysicalName.Contains "TANKA" && item.DataLength1 = 8 && item.DataLength2 = 2)
+               || (item.PhysicalName.Contains "HATARI" && item.DataLength1 = 8 && item.DataLength2 = 2)
+               || (item.PhysicalName.Contains "KINGAKU" && item.DataLength1 = 8 && item.DataLength2 = 2)
+               || (item.PhysicalName.Contains "TATENE" && item.DataLength1 = 8 && item.DataLength2 = 2)
+            then "#,##" + (GetNumberFormat (item.DataLength2 + 1) item.DataLength2 "0")
+                + ";[赤]-#,##" + (GetNumberFormat (item.DataLength2 + 1) item.DataLength2 "0")
+            elif item.DomainPhysicalName = "TAX_RITU"
+                 || (item.PhysicalName.Contains "TAX"
+                     && item.PhysicalName.Contains "RITU"
+                     && item.DataLength1 = 4
+                     && item.DataLength2 = 3)
+            then "0.0%"
+            else (GetNumberFormat (item.DataLength2 + 1) item.DataLength2 "0") + "_ "
         | "CHAR" -> "@"
         | "VARCHAR2" -> "@"
         | _ -> ""
@@ -95,7 +169,7 @@ let MakeListItem (ary2d:string[][]) =
         |> MakeObject' 
         |> (fun item -> {item with
                            DataLengthDsp = LengthPairToString item.DataLength1 item.DataLength2
-                           ColumnWidth = GetColumnWidth item.DataLength1
+                           ColumnWidth = GetColumnWidth (float item.DataLength1)
                            ValidationCusmomOperator = GetValidationCusmomOperator item
                            NumberFormat = GetFormat item
                            NumberFormatMin = "-" + (GetNumberFormat item.DataLength1 item.DataLength2 "9")

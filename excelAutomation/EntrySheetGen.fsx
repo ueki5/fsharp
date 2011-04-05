@@ -28,32 +28,28 @@ open ListEntity
 open ListEntityItem
 open ListEntityIndex
 
-let currDir = Directory.GetCurrentDirectory()
-let csvDir = currDir + "\\" + "CSV"
-let tmplDir = currDir + "\\" + "TEMPLATE"
-let outDir = currDir + "\\" + "OUT"
-let dicDomain =
+let GetDomain csvDir =
     FileToArray(csvDir + "\\" + "List_Domain.CSV")
     |> MakeListDomain
-let dicCondition =
+let GetCondition csvDir =
     FileToArray(csvDir + "\\" + "List_Condition.CSV")
     |> MakeListCondition
-let dicConditionItem =
+let GetConditionItem csvDir =
     FileToArray(csvDir + "\\" + "List_Condition_Item.CSV")
     |> MakeListConditionItem
-let dicItem =
+let GetItem csvDir =
     FileToArray(csvDir + "\\" + "List_Item.CSV")
     |> MakeListItem
-let dicEntity =
+let GetEntity csvDir =
     FileToArray(csvDir + "\\" + "List_Entity.CSV")
     |> MakeListEntity
-let dicEntityItem =
+let GetEntityItem csvDir =
     FileToArray(csvDir + "\\" + "List_Entity_Item.CSV")
     |> MakeListEntityItem
-let dicEntityIndex =
+let GetEntityIndex csvDir =
     FileToArray(csvDir + "\\" + "List_Entity_Index.CSV")
     |> MakeListEntityIndex
-let ProcessConditionItem =
+let ProcessConditionItem (dicConditionItem:ConditionItemDictionary) (dicCondition:ConditionDictionary) =
     for conditem in dicConditionItem do
         if dicCondition.ContainsKey(conditem.Value.ConditionPhysicalName)
         then
@@ -61,7 +57,7 @@ let ProcessConditionItem =
             let _ = cond.ConditionItems.Add(conditem.Key, conditem.Value)
             ()
         else ()
-let ProcessItem =
+let ProcessItem (dicItem:ItemDictionary) (dicCondition:ConditionDictionary) =
     for item in dicItem do
         if dicCondition.ContainsKey(item.Value.ConditionPhysicalName)
         then
@@ -69,7 +65,12 @@ let ProcessItem =
             ignore(item.Value.ConditionRef <- Some(cond))
             ()
         else ()
-let ProcessEntityItem =
+let ProcessEntityItem
+    (dicEntityItem:EntityItemDictionary)
+    (dicEntityIndex:EntityIndexDictionary)
+    (dicItem:ItemDictionary)
+    (dicCondition:ConditionDictionary)
+    (dicEntity:EntityDictionary) =
     for entitem in dicEntityItem do
         if dicEntityIndex.ContainsKey(entitem.Key)
         then
@@ -101,7 +102,7 @@ let ProcessEntityItem =
             let _ = ent.EntityItems.Add(entitem.Key, entitem.Value)
             ()
         else ()
-let ReNumberEntityItem =
+let ReNumberEntityItem (dicEntity:EntityDictionary) =
     // 一般の項目が前に、共通項目が後になるよう、番号を振り直す。
     for ent in dicEntity.Values do
         let mutable idx = 0
@@ -118,37 +119,74 @@ let ReNumberEntityItem =
                 idx <- idx + 1
                 entitem.ItemIndex <- idx
     ()
-let CreateExcel (ent:Entity) = 
+
+let SetPattern (range:Range) =
+    range.Borders.[XlBordersIndex.xlDiagonalDown].LineStyle <- Constants.xlNone
+    range.Borders.[XlBordersIndex.xlDiagonalDown].LineStyle <- Constants.xlNone
+    range.Borders.[XlBordersIndex.xlDiagonalUp].LineStyle <- Constants.xlNone
+    range.Borders.[XlBordersIndex.xlEdgeLeft].LineStyle <- XlLineStyle.xlContinuous
+    range.Borders.[XlBordersIndex.xlEdgeLeft].Weight <- XlBorderWeight.xlThin
+    range.Borders.[XlBordersIndex.xlEdgeLeft].ColorIndex <- Constants.xlAutomatic
+    range.Borders.[XlBordersIndex.xlEdgeTop].LineStyle <- XlLineStyle.xlContinuous
+    range.Borders.[XlBordersIndex.xlEdgeTop].Weight <- XlBorderWeight.xlThin
+    range.Borders.[XlBordersIndex.xlEdgeTop].ColorIndex <- Constants.xlAutomatic
+    range.Borders.[XlBordersIndex.xlEdgeBottom].LineStyle <- XlLineStyle.xlContinuous
+    range.Borders.[XlBordersIndex.xlEdgeBottom].Weight <- XlBorderWeight.xlThin
+    range.Borders.[XlBordersIndex.xlEdgeBottom].ColorIndex <- Constants.xlAutomatic
+    range.Borders.[XlBordersIndex.xlEdgeRight].LineStyle <- XlLineStyle.xlContinuous
+    range.Borders.[XlBordersIndex.xlEdgeRight].Weight <- XlBorderWeight.xlThin
+    range.Borders.[XlBordersIndex.xlEdgeRight].ColorIndex <- Constants.xlAutomatic
+
+let CreateExcel (ent:Entity) (outDir:string) = 
     let app = new ApplicationClass(Visible = false) 
     app.DisplayAlerts <- false
     let workbooks = app.Workbooks
-    let workbook = workbooks.Open(tmplDir + "\\" + "Document.XLT")
-    let sheets = workbook.Worksheets
-    let worksheet = (sheets.[box 1] :?> _Worksheet)
+    let workbook = workbooks.Add(XlWBATemplate.xlWBATWorksheet) 
+    let sheets = workbook.Worksheets 
+    let worksheet = (sheets.[box 1] :?> _Worksheet) 
+    // let app = new ApplicationClass(Visible = false) 
+    // app.DisplayAlerts <- false
+    // let workbooks = app.Workbooks
+    // // let workbook = workbooks.Open(tmplDir + "\\" + "Document.XLT")
+    // let sheets = workbook.Worksheets
+    // let worksheet = (sheets.[box 1] :?> _Worksheet)
 
     worksheet.Name <- ent.PhysicalName
     for entitem in ent.EntityItems.Values do
         match IsCommonItem(entitem.PhysicalName) with
         | true     -> ()
-        | false    -> 
-            let ColorIndexBk = worksheet.Range("CELL_ITEM_VALUE").Interior.ColorIndex
-            worksheet.Range("CELL_ITEM_LOGICAL_NAME").Value2 <- entitem.LogicalName
-            worksheet.Range("CELL_ITEM_PHYSICAL_NAME").Value2 <- entitem.PhysicalName
-            worksheet.Range("CELL_ITEM_REMARKS").Value2 <- entitem.Remarks
+        | false    ->
+            for idx in [4 .. InputRow] do
+                SetPattern (worksheet.Range (Cell (entitem.ItemIndex, idx)))
+            worksheet.Range(Cell (entitem.ItemIndex, 4)).Value2 <- entitem.LogicalName
+            worksheet.Range(Cell (entitem.ItemIndex, 4)).Interior.ColorIndex <- TitleBackColor
+            worksheet.Range(Cell (entitem.ItemIndex, 4)).Font.ColorIndex <- TitleFontColor
+            worksheet.Range(Cell (entitem.ItemIndex, 4)).HorizontalAlignment <- Constants.xlLeft
+            worksheet.Range(Cell (entitem.ItemIndex, 5)).Value2 <- entitem.PhysicalName
+            worksheet.Range(Cell (entitem.ItemIndex, 5)).Interior.ColorIndex <- TitleBackColor
+            worksheet.Range(Cell (entitem.ItemIndex, 5)).Font.ColorIndex <- TitleFontColor
+            worksheet.Range(Cell (entitem.ItemIndex, 5)).HorizontalAlignment <- Constants.xlLeft
+            worksheet.Range(Cell (entitem.ItemIndex, 8)).Value2 <- entitem.Remarks
+            worksheet.Range(Cell (entitem.ItemIndex, 8)).Interior.ColorIndex <- RemarksColor
+            worksheet.Range(Cell (entitem.ItemIndex, 8)).WrapText <- true
+            worksheet.Range(Cell (entitem.ItemIndex, 8)).HorizontalAlignment <- Constants.xlLeft
+
             match entitem.ItemRef with
             | None -> ()
             | Some itemref ->
-                worksheet.Range("CELL_ITEM_DATA_TYPE").Value2 <- itemref.DataType
-                worksheet.Range("CELL_ITEM_DATA_LENGTH").Value2 <- itemref.DataLengthDsp
-                worksheet.Range("CELL_ITEM_VALUE").NumberFormatLocal <- itemref.NumberFormat
-                // printfn "type=%s,len1=%d,len2=%d,format=%s" itemref.DataType itemref.DataLength1 itemref.DataLength2 itemref.NumberFormat
-                worksheet.Range("COL_COLUMN").ColumnWidth <- itemref.ColumnWidth
-                // worksheet.Range("COL_COLUMN").EntireColumn.AutoFit()
-                // if itemref.ColumnWidth > worksheet.Range("COL_COLUMN").ColumnWidth
-                // then worksheet.Range("COL_COLUMN").ColumnWidth <- itemref.ColumnWidth
-                // else ()
-
-                let validation = worksheet.Range("CELL_ITEM_VALUE").Validation
+                worksheet.Range(Cell (entitem.ItemIndex, 6)).Value2 <- itemref.DataType
+                worksheet.Range(Cell (entitem.ItemIndex, 6)).Interior.ColorIndex <- DataAttrColor
+                worksheet.Range(Cell (entitem.ItemIndex, 6)).HorizontalAlignment <- Constants.xlLeft
+                worksheet.Range(Cell (entitem.ItemIndex, 7)).Value2 <- itemref.DataLengthDsp
+                worksheet.Range(Cell (entitem.ItemIndex, 7)).Interior.ColorIndex <- DataAttrColor
+                worksheet.Range(Cell (entitem.ItemIndex, 7)).HorizontalAlignment <- Constants.xlLeft
+                worksheet.Range(Cell (entitem.ItemIndex, InputRow)).NumberFormatLocal <- itemref.NumberFormat
+                ignore <| worksheet.Range(Column entitem.ItemIndex).EntireColumn.AutoFit()
+                let width = unbox<float> (worksheet.Range(Column entitem.ItemIndex).ColumnWidth)
+                if width < itemref.ColumnWidth
+                then worksheet.Range(Column entitem.ItemIndex).ColumnWidth <- itemref.ColumnWidth
+                else ()
+                let validation = worksheet.Range(Cell (entitem.ItemIndex, InputRow)).Validation
                 ignore(validation.Delete())
                 ignore <| match (itemref.DataType, itemref.ConditionRef) with
                             | (_ , Some(cond)) ->
@@ -171,14 +209,18 @@ let CreateExcel (ent:Entity) =
                                     XlDVType.xlValidateCustom
                                     , XlDVAlertStyle.xlValidAlertStop
                                     , XlFormatConditionOperator.xlBetween
-                                    , "=LENB(A9)" + itemref.ValidationCusmomOperator + "A$7")
+                                    , "=LENB(" + (Cell (entitem.ItemIndex, InputRow)) + ")"
+                                      + itemref.ValidationCusmomOperator
+                                      + (CellRA (entitem.ItemIndex, DataLengthRow)))
                                 validation.IMEMode <- int XlIMEMode.xlIMEModeOff
                             | ("VARCHAR2", None) ->
                                 validation.Add(
                                     XlDVType.xlValidateCustom
                                     , XlDVAlertStyle.xlValidAlertStop
                                     , XlFormatConditionOperator.xlBetween
-                                    , "=LENB(A9)" + itemref.ValidationCusmomOperator + "A$7")
+                                    , "=LENB(" + (Cell (entitem.ItemIndex, InputRow)) + ")"
+                                      + itemref.ValidationCusmomOperator
+                                      + (CellRA (entitem.ItemIndex, DataLengthRow)))
                                 validation.IMEMode <- int XlIMEMode.xlIMEModeOn
                             | _ -> ()
                 validation.IgnoreBlank <- true
@@ -195,19 +237,12 @@ let CreateExcel (ent:Entity) =
                     match entitem.NotNull with
                     | "true"
                     | "TRUE" ->
-                        worksheet.Range("CELL_ITEM_VALUE").Interior.ColorIndex <- 6
+                        worksheet.Range(Cell (entitem.ItemIndex, InputRow)).Interior.ColorIndex <- NotNullColor
                         validation.InputMessage <- "必須項目です。"
                     | _ -> ()
                 | Some pkeyindex ->
-                    worksheet.Range("CELL_ITEM_VALUE").Interior.ColorIndex <- 38
+                    worksheet.Range(Cell (entitem.ItemIndex, InputRow)).Interior.ColorIndex <- PkeyColor
                     validation.InputMessage <- "キー項目です。"
-            ignore <| worksheet.Range("COL_COLUMN").Copy()
-            ignore <| worksheet.Range("COL_INSERTAT").Insert(XlDirection.xlToRight)
-            ignore <| worksheet.Range("CELL_ITEM_VALUE").Interior.ColorIndex <- ColorIndexBk
-    ignore <| worksheet.Range("COL_COLUMN").Delete()
-    ignore <| worksheet.Range("COL_INSERTAT").Delete()
-    // printfn "%s" (GetInsertSql1 ent)
-    // printfn "%s" (GetInsertSql2 ent)
     worksheet.Range(Cell (1,1)).Value2 <- ent.PhysicalName
     worksheet.Range(Cell (1,2)).Value2 <- ent.LogicalName
     worksheet.Range(Cell (1,2)).Value2 <- ent.LogicalName
@@ -223,12 +258,17 @@ let CreateExcel (ent:Entity) =
     worksheet.Range(Cell (6,2)).Value2 <- "SQL"
     worksheet.Range(Cell (GetSqlPos ent 0)).Value2 <- (GetInsertSql1 ent)
     worksheet.Range(Cell (GetSqlPos ent 1)).Value2 <- (GetInsertSql2 ent)
-    let mutable idx = 0
+    // VALUE句をセットする。
+    let offset = 1
+    let mutable idx = offset
     for entitem in ent.EntityItems.Values do
         idx <- idx + 1
-        match idx < ent.EntityItems.Count with
-        | true -> worksheet.Range(Cell (GetSqlPos ent (idx + 1))).Value2 <- "=" + (GetSqlValue entitem) + " & \",\" & " + Cell (GetSqlPos ent (idx + 2))
-        | false -> worksheet.Range(Cell (GetSqlPos ent (idx + 1))).Value2 <- "=" + (GetSqlValue entitem)
+        match idx < ent.EntityItems.Count + offset with
+        | true -> worksheet.Range(Cell (GetSqlPos ent idx)).Value2 <- "=" + (GetSqlValue entitem) + " & \",\" & " + Cell (GetSqlPos ent (idx + 1))
+        | false -> worksheet.Range(Cell (GetSqlPos ent idx)).Value2 <- "=" + (GetSqlValue entitem)
+    // 固定枠を設定
+    ignore <| worksheet.Range(Cell (GetFreezePanesPos ent)).Select()
+    app.ActiveWindow.FreezePanes <- true
     workbook.SaveAs(outDir + "\\" + ent.PhysicalName + "("+ ent.LogicalName + ")" + ".xls")
     app.UserControl <- false
     app.Quit()
@@ -240,16 +280,30 @@ let MakeDirectory dirpath =
 #if COMPILED
 [<EntryPoint>]
 #endif
-let main (_) =
-    ignore <| MakeDirectory(outDir)
-    ignore <| ProcessConditionItem
-    ignore <| ProcessEntityItem
-    ignore <| ReNumberEntityItem
+let main (args:string[]) =
+    let currDir = Directory.GetCurrentDirectory()
+    let csvDir = 
+        match args.Length with
+        | 1 -> args.[0]
+        | _ -> currDir + "\\" + "一覧出力"
+    let outDir = currDir + "\\" + "OUT"
+    let dicDomain = GetDomain csvDir
+    let dicCondition = GetCondition csvDir
+    let dicConditionItem = GetConditionItem csvDir
+    let dicItem = GetItem csvDir
+    let dicEntity = GetEntity csvDir
+    let dicEntityItem = GetEntityItem csvDir
+    let dicEntityIndex = GetEntityIndex csvDir
+    ProcessConditionItem dicConditionItem dicCondition
+    ProcessItem dicItem dicCondition
+    ProcessEntityItem dicEntityItem dicEntityIndex dicItem dicCondition dicEntity
+    ReNumberEntityItem dicEntity
+    ignore <| MakeDirectory outDir
     for ent in dicEntity.Values do
         match (IsTarget ent) with
         | true ->
             printfn "エンティティ[%s]を処理中…" ent.PhysicalName
-            CreateExcel ent
+            CreateExcel ent outDir
         | false ->
             printfn "エンティティ[%s]をスキップしました。" ent.PhysicalName
     0

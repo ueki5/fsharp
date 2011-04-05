@@ -64,3 +64,12 @@ let GetSqlPos (entity:Entity) offset =
 let GetInsertSql1 (entity:Entity) = "=\"INSERT INTO " + entity.PhysicalName + "(\" & " + (Cell (GetSqlPos entity 1)) + " & \") VALUES(\" & " + (Cell (GetSqlPos entity 2)) + "& \");\""
 let GetInsertSql2 (entity:Entity) = entityitems entity
 let IsTarget (entity:Entity) = (String.length entity.PhysicalName > 3) && (entity.PhysicalName.[0..2] <> "ZV_")
+let GetFreezePanesPos (entity:Entity) =
+    let mutable pos = 0
+    for entitem in entity.EntityItems.Values do
+        match (pos, entitem.PkeyIndex) with
+        | (0, None) -> pos <- entitem.ItemIndex
+        | _ -> ()
+    if pos > 0
+    then (pos, InputRow)
+    else (  1, InputRow)

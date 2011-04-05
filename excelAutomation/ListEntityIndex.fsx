@@ -23,8 +23,9 @@ type EntityIndex = {
    ;UpdDate:string
    }
 
+type EntityIndexDictionary = Dictionary<string * string, EntityIndex>
 let MakeListEntityIndex (ary2d:string[][]) =
-    let objTbl = new Dictionary<string * string, EntityIndex>()
+    let objTbl = new EntityIndexDictionary()
     let MakeObject (ary:string []) = {
             EntityPhysicalName = ary.[0]
             EntityLogicalName = ary.[1]

@@ -11,11 +11,19 @@ open System
 open System.IO
 //open System.Runtime.InteropServices
 
+let PkeyColor = 38
+let NotNullColor = 6
+let TitleBackColor = 11
+let TitleFontColor = 2
+let DataAttrColor = 37
+let RemarksColor = 24
+
 let CommonColumnCount = 15 - 1
 let CommonColumnOffset = 1
 let CommonRow = 2
 let InputColumnOffset = 0
 let InputRow = 9
+let DataLengthRow = 7
 
 let NumToAlph n =
     match n with
@@ -59,3 +67,9 @@ let CellRA (col, row) = (PosX col) + "$" + (PosY row)
 let CellAR (col, row) = "$" + (PosX col) + (PosY row)
 let CellAA (col, row) = "$" + (PosX col) + "$" + (PosY row)
 let Cell = CellRR
+let ColumnR col = PosX col + ":" + PosX col
+let ColumnA col = "$" + (PosX col) + ":" + "$" + (PosX col)
+let Column = ColumnR
+let RowR row = PosY row + ":" + PosY row
+let RowA row = "$" + (PosY row) + ":" + "$" + (PosY row)
+let Row = RowR
