@@ -24,12 +24,12 @@ type Domain = {
       ;UpdID:string
       ;UpdDate:string
       }
-
+type DomainDictionary = Dictionary<string, Domain>
 let MakeListDomain (ary2d:string[][]) =
     let TryInt s = match Int32.TryParse(s) with
                          | (false, _) -> 0
                          | (true, n) -> n
-    let objTbl = new Dictionary<string, Domain>()
+    let objTbl = new DomainDictionary()
     let MakeObject (ary:string []) = {
         PhysicalName = ary.[0]
         LogicalName = ary.[1]
