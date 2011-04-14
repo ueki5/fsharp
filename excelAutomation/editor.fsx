@@ -92,6 +92,12 @@ let _ = miAbout.Click.Add(opAbout)
 #if COMPILED
 // Run the main code. The attribute marks the startup application thread as "Single 
 // Thread Apartment" mode, which is recommended for .NET GUI applications. 
+[<EntryPoint>]    
 [<STAThread()>]    
+#endif
+let main (args:string[]) =
+    do Application.Run(form)
+    0
+#if INTERACTIVE
 do Application.Run(form)
 #endif
