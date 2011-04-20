@@ -24,6 +24,7 @@ let CommonRow = 2
 let InputColumnOffset = 0
 let InputRow = 9
 let DataLengthRow = 7
+let ColumnPhysicalNameRow = 5
 
 let NumToAlph n =
     match n with

@@ -36,12 +36,6 @@ let MakeDirectory dirpath =
     then Directory.Delete(dirpath,true)
     else ()
     Directory.CreateDirectory(dirpath)
-// let GetDomain csvDir =
-//     let filename = csvDir + "\\" + "List_Domain.CSV"
-//     if File.Exists filename
-//     then Some(FileToArray filename |> MakeListDomain)
-//     else printfn "入力ファイル[%s]が見つかりません" filename
-//          None
 
 // コンディション一覧出力のCSVファイルから、コンディションの情報を読み込みます。
 let GetCondition csvDir =
@@ -326,17 +320,17 @@ let CreateExcel (app:ApplicationClass) (ent:Entity) (outDir:string) =
     worksheet.Range(Cell (5,2)).Value2 <- "ZPK_DBINFO.GET_IPADDR"
     worksheet.Range(Cell (6,2)).Value2 <- "SQL"
     // SQLを組み立てる参照式
-    worksheet.Range(Cell (GetSqlPos ent 0)).Value2 <- (GetInsertSql1 ent)
-    // 項目名の列挙
-    worksheet.Range(Cell (GetSqlPos ent 1)).Value2 <- (GetInsertSql2 ent)
-    // VALUE句をセットする。
-    let offset = 1
+    worksheet.Range(Cell (GetSqlPos ent 0)).Value2 <- (GetInsertSql ent)
+   // SELECT句、VALUE句をセットする。
+    let offset = 0
     let mutable idx = offset
     for entitem in ent.EntityItems.Values do
         idx <- idx + 1
         match idx < ent.EntityItems.Count + offset with
-        | true -> worksheet.Range(Cell (GetSqlPos ent idx)).Value2 <- "=" + (GetSqlValue entitem) + " & \",\" & " + Cell (GetSqlPos ent (idx + 1))
-        | false -> worksheet.Range(Cell (GetSqlPos ent idx)).Value2 <- "=" + (GetSqlValue entitem)
+        | true -> worksheet.Range(Cell (GetColumnPos ent idx)).Value2 <- "=\"" + entitem.PhysicalName + "\" & \",\" & " + Cell (GetColumnPos ent (idx + 1))
+                  worksheet.Range(Cell (GetSqlPos ent idx)).Value2 <- "=" + (GetSqlValue entitem) + " & \",\" & " + Cell (GetSqlPos ent (idx + 1))
+        | false -> worksheet.Range(Cell (GetColumnPos ent idx)).Value2 <- "=\"" + entitem.PhysicalName + "\""
+                   worksheet.Range(Cell (GetSqlPos ent idx)).Value2 <- "=" + (GetSqlValue entitem)
     // 固定枠を設定
     ignore <| worksheet.Range(Cell (GetFreezePanesPos ent)).Select()
     app.ActiveWindow.FreezePanes <- true
@@ -403,4 +397,3 @@ let main (args:string[]) =
 #if INTERACTIVE
 main
 #endif
-//fsc ExcelAutomation.fsx QuiQPro.fsx FileReader.fsx ListDomain.fsx ListConditionItem.fsx ListCondition.fsx ListItem.fsx ListEntityItem.fsx ListEntity.fsx ListEntityIndex.fsx EntrySheetGen.fsx --standalone -r:"Microsoft.Office.Interop.Excel.dll"
