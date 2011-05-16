@@ -5,7 +5,7 @@
 module ExcelAutomation
 #endif
 
-// For COMException 
+// For COMException
 //open Microsoft.Office.Interop.Excel
 open System
 open System.IO
