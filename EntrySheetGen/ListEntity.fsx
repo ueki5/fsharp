@@ -56,6 +56,7 @@ let GetSqlPos (entity:Entity) offset =
     | true  -> (1 + offset , InputRow)
     | false -> (InputColumnOffset + entity.EntityItems.Count - CommonColumnCount + offset, InputRow)
 let GetInsertSql (entity:Entity) = "=\"INSERT INTO " + entity.PhysicalName + "(\" & " + (CellRA (GetColumnPos entity 1)) + " & \") VALUES(\" & " + (Cell (GetSqlPos entity 1)) + "& \");\""
+let GetUpdateSql (entity:Entity) = "=\"UPDATE " + entity.PhysicalName + " SET \" & " + (Cell (GetSqlPos entity 1)) + " & \" WHERE ;\""
 let IsTarget (entity:Entity) = (String.length entity.PhysicalName > 3) && (entity.PhysicalName.[0..2] <> "ZV_")
 let GetFreezePanesPos (entity:Entity) =
     let mutable pos = 0

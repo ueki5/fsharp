@@ -86,6 +86,7 @@ let MakeListItem (ary2d:string[][]) =
         match item.DataType with
         // | "CHAR" -> "="
         | "CHAR" ->
+            // 桁数完全一致とする項目
             if
                   (item.DomainPhysicalName <> "SHN_CD")
                   && (not (item.PhysicalName.Contains "SHN_CD") || item.DataLength1 <> 4)
@@ -107,7 +108,13 @@ let MakeListItem (ary2d:string[][]) =
                       || (item.DomainPhysicalName = "MM")
                       || (item.DomainPhysicalName = "DD")
                       || (item.DomainPhysicalName.StartsWith "DATETIME"))
+                  && (item.PhysicalName <> "SIKIBETU_CD")
+                  && (item.PhysicalName <> "GENERAL_KBN_CD")
+                  && (item.PhysicalName <> "SYUBETU_CD")
+                  && (item.PhysicalName <> "SIKIBETU_CD")
+                  && (item.PhysicalName <> "KBN_CD")
             then "="
+            // 上限のみ
             else "<="
         | "VARCHAR2" -> "<="
         | _ -> ""
@@ -116,6 +123,7 @@ let MakeListItem (ary2d:string[][]) =
         | "NUMBER" ->
             if item.DomainPhysicalName.StartsWith "KINGAKU"
                || item.DomainPhysicalName = "TANKA"
+               || (item.PhysicalName.Contains "KAMOKU_CD" && item.DataLength1 = 5 && item.DataLength2 = 0)
                || (item.PhysicalName.Contains "_KINGAKU" && item.DataLength1 = 8 && item.DataLength2 = 0)
                || (item.PhysicalName.Contains "_KIN8" && item.DataLength1 = 8 && item.DataLength2 = 0)
                || (item.PhysicalName.Contains "_KIN10" && item.DataLength1 = 10 && item.DataLength2 = 0)

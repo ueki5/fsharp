@@ -1,19 +1,28 @@
-#if COMPILED
-module FileReader
-#endif
-
+module TextReader
 open System
 open System.IO
 open System.Text
+open FParsec.Primitives
+open FParsec.CharParsers
+open FParsec.Error
+
+let rec getFiles targetDir =  
+    seq {   for file in Directory.GetFiles(targetDir) do  
+               yield (file)
+            for subDir in Directory.GetDirectories targetDir do  
+                yield! (getFiles subDir) }
 
 let FileToLine (filename:string) =
-    let r = new StreamReader(filename, Encoding.GetEncoding("Shift-JIS"))
+    let r = new StreamReader (filename, Encoding.GetEncoding("Shift-JIS"))
     r.ReadToEnd()
+
 let LineToList (line:string) =
     line.ToCharArray()
     |> Array.toList
+
 type ReadStatus = Normal
                 | Quoted
+
 let ListToLines list =
     let rec ListToLines' sta list line lines =
         match (sta, list) with
@@ -21,7 +30,7 @@ let ListToLines list =
                             then lines
                             else line::lines
                           |> List.rev
-                          |> List.toArray
+                          // |> List.toArray
         | (Normal, '\r'::'\n'::cs)
         | (Normal, '\n'::cs) -> (ListToLines' Normal cs "" (line::lines))
         | (Normal, '\"'::cs) -> (ListToLines' Quoted cs line lines)
@@ -29,16 +38,15 @@ let ListToLines list =
         | (Quoted, '\"'::'\"'::cs) -> (ListToLines' Quoted cs (line + string '\"') lines)
         | (Quoted, '\"'::cs) -> (ListToLines' Normal cs line lines)
         | (Quoted, c::cs) -> (ListToLines' Quoted cs (line + string c) lines)
-        | (_, _) -> [|"Case is not match! line="; line|]
+        | (_, _) -> ["Case is not match! line="; line]
     ListToLines' Normal list "" []
-let SplitToLines line =
-    line
-    |> LineToList
-    |> ListToLines
+
 let FileToLines =
     FileToLine
     >> LineToList
     >> ListToLines
-let FileToArray filename =
-    let lines = FileToLines filename
-    List.toArray [ for line in lines -> line.Split([|','|])]
+
+FileToLines "D:\\WORK\\CHK_GLOVIA.TXT"
+for line in (FileToLines "D:\\WORK\\CHK_GLOVIA.TXT") do
+    printfn "%s" line
+done

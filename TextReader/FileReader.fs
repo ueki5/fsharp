@@ -1,13 +1,11 @@
-#if COMPILED
-module FileReader
-#endif
-
+#ligth "off"
+module FileReader begin
 open System
 open System.IO
 open System.Text
 
 let FileToLine (filename:string) =
-    let r = new StreamReader(filename, Encoding.GetEncoding("Shift-JIS"))
+    let r = new StreamReader (filename, Encoding.GetEncoding("Shift-JIS"))
     r.ReadToEnd()
 let LineToList (line:string) =
     line.ToCharArray()
@@ -42,3 +40,4 @@ let FileToLines =
 let FileToArray filename =
     let lines = FileToLines filename
     List.toArray [ for line in lines -> line.Split([|','|])]
+end
