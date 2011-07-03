@@ -93,6 +93,7 @@ let MakeListItem (ary2d:string[][]) =
                   && (item.DomainPhysicalName <> "TORIHIKI_ZYOUKEN_CD")
                   && (not (item.PhysicalName.Contains "TORIHIKI_ZYOUKEN_CD") || item.DataLength1 <> 4)
                   && (not (item.PhysicalName.Contains "ZIHANKI_BAIKA_ZYOUKEN_CD") || item.DataLength1 <> 4)
+                  && (not (item.PhysicalName.Contains "KAMOKU_CD") || item.DataLength1 <> 5)
                   && ((item.PhysicalName.EndsWith "_CD")
                       || (item.PhysicalName.EndsWith "_KBN")
                       || (item.PhysicalName.EndsWith "_BI" && item.DataLength1 = 8)
@@ -123,7 +124,6 @@ let MakeListItem (ary2d:string[][]) =
         | "NUMBER" ->
             if item.DomainPhysicalName.StartsWith "KINGAKU"
                || item.DomainPhysicalName = "TANKA"
-               || (item.PhysicalName.Contains "KAMOKU_CD" && item.DataLength1 = 5 && item.DataLength2 = 0)
                || (item.PhysicalName.Contains "_KINGAKU" && item.DataLength1 = 8 && item.DataLength2 = 0)
                || (item.PhysicalName.Contains "_KIN8" && item.DataLength1 = 8 && item.DataLength2 = 0)
                || (item.PhysicalName.Contains "_KIN10" && item.DataLength1 = 10 && item.DataLength2 = 0)
