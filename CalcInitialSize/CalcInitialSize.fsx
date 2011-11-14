@@ -9,9 +9,10 @@
 #load "ListEntity.fsx"
 // #load "ListEntityItem.fsx"
 #load "ListEntityIndex.fsx"
+#load "ListIndex.fsx"
 #endif
 #if COMPILED
-module EntrySheetGen
+module CalcInitialSize
 #endif
 open System
 open System.IO
@@ -27,9 +28,10 @@ open ListItem
 open ListEntity
 open ListEntityItem
 open ListEntityIndex
+open ListIndex
 
 let CsvSubDir = "一覧出力"
-let OutSubDir = "登録シート"
+let OutSubDir = "初期サイズ計算"
 // ディレクトリを作成する
 let MakeDirectory dirpath =
     if Directory.Exists(dirpath)
@@ -86,6 +88,14 @@ let GetEntityIndex csvDir =
     let filename = csvDir + "\\" + "List_Entity_Index.CSV"
     if File.Exists filename
     then Some(FileToArray filename |> MakeListEntityIndex)
+    else printfn "入力ファイル[%s]が見つかりません" filename
+         None
+
+// エンティティインデックス一覧出力のCSVファイルから、インデックスの情報を読み込みます。
+let GetIndex csvDir =
+    let filename = csvDir + "\\" + "List_Entity_Index.CSV"
+    if File.Exists filename
+    then Some(FileToArray filename |> MakeListIndex)
     else printfn "入力ファイル[%s]が見つかりません" filename
          None
 
@@ -154,6 +164,18 @@ let ProcessEntityItem
             ()
         else ()
 
+// インデックス項目に情報を付加します。
+let ProcessIndexItem
+    (dicIndex:IndexDictionary)
+    (dicItem:ItemDictionary) =
+    for inditem in dicIndex do
+        // 項目情報を付加します。
+        if dicItem.ContainsKey(inditem.Value.EntItemPhysicalName)
+        then
+            let item = dicItem.[inditem.Value.EntItemPhysicalName]
+            ignore(inditem.Value.ItemRef <- Some(item))
+        else ()
+
 // 一般の項目が前に、共通項目が後になるよう、番号を振り直します。
 let ReNumberEntityItem (dicEntity:EntityDictionary) =
     for ent in dicEntity.Values do
@@ -191,155 +213,95 @@ let SetPattern (range:Range) =
     range.Borders.[XlBordersIndex.xlEdgeRight].ColorIndex <- Constants.xlAutomatic
 
 // エンティティ単位に、エクセルファイルを作成します。
-let CreateExcel (app:ApplicationClass) (ent:Entity) (outDir:string) = 
-    let workbooks = app.Workbooks
-    let workbook = workbooks.Add(XlWBATemplate.xlWBATWorksheet) 
-    let sheets = workbook.Worksheets 
-    let worksheet = (sheets.[box 1] :?> _Worksheet) 
+let WriteExcel (worksheet:_Worksheet) (ent:Entity) (dicIndex:IndexDictionary) initRow = 
 
-    worksheet.Name <- ent.PhysicalName
-    // エンティティ項目毎に、入力欄を作成します。（共通項目はスキップします）
+    // データ属性から、１レコードあたりの必要容量を算出します。
+    let mutable row = initRow
+    let mutable totalSize = 0
+    let mutable indexCount = 0
+    let mutable indexCountWithoutPK = 0
+    let objTbl = new Dictionary<string , (string * int * int)>()
     for entitem in ent.EntityItems.Values do
-        match IsCommonItem(entitem.PhysicalName) with
-        | true     -> ()
-        | false    ->
-            // 罫線のセット
-            for idx in [4 .. InputRow] do
-                SetPattern (worksheet.Range (Cell (entitem.ItemIndex, idx)))
-            // 項目論理名
-            worksheet.Range(Cell (entitem.ItemIndex, 4)).Value2 <- entitem.LogicalName
-            worksheet.Range(Cell (entitem.ItemIndex, 4)).Interior.ColorIndex <- TitleBackColor
-            worksheet.Range(Cell (entitem.ItemIndex, 4)).Font.ColorIndex <- TitleFontColor
-            worksheet.Range(Cell (entitem.ItemIndex, 4)).HorizontalAlignment <- Constants.xlLeft
-            // 項目物理名
-            worksheet.Range(Cell (entitem.ItemIndex, 5)).Value2 <- entitem.PhysicalName
-            worksheet.Range(Cell (entitem.ItemIndex, 5)).Interior.ColorIndex <- TitleBackColor
-            worksheet.Range(Cell (entitem.ItemIndex, 5)).Font.ColorIndex <- TitleFontColor
-            worksheet.Range(Cell (entitem.ItemIndex, 5)).HorizontalAlignment <- Constants.xlLeft
-            // 備考
-            worksheet.Range(Cell (entitem.ItemIndex, 8)).Value2 <- entitem.Remarks
-            worksheet.Range(Cell (entitem.ItemIndex, 8)).Interior.ColorIndex <- RemarksColor
-            worksheet.Range(Cell (entitem.ItemIndex, 8)).WrapText <- true
-            worksheet.Range(Cell (entitem.ItemIndex, 8)).HorizontalAlignment <- Constants.xlLeft
-
-            // 項目を設定します。
-            match entitem.ItemRef with
+        // 項目を設定します。
+        match entitem.ItemRef with
+        | None -> ()
+        | Some itemref ->
+            let size = match itemref.DataType with
+                | "NUMBER"     -> 1 + itemref.DataLength1 / 2
+                | "CHAR"
+                | "VARCHAR2" -> itemref.DataLength1
+            totalSize <- totalSize + size
+            // ignore <| (printfn "項目名:%s,データタイプ:%s,全体桁数:%d" entitem.PhysicalName,itemref.DataType,itemref.DataLength1)
+            printfn "項目名:%s,データタイプ:%s,全体桁数:%d,サイズ:%d" entitem.PhysicalName itemref.DataType itemref.DataLength1 size
+    // データ属性から、１レコードあたりのインデックス必要容量を算出します。
+    for inditem in dicIndex do
+        if ent.PhysicalName = inditem.Value.EntityPhysicalName
+        then
+            printfn "エンティティ物理名:%s" inditem.Value.EntityPhysicalName
+            match inditem.Value.ItemRef with
             | None -> ()
-            | Some itemref ->
-                // データ型
-                worksheet.Range(Cell (entitem.ItemIndex, 6)).Value2 <- itemref.DataType
-                worksheet.Range(Cell (entitem.ItemIndex, 6)).Interior.ColorIndex <- DataAttrColor
-                worksheet.Range(Cell (entitem.ItemIndex, 6)).HorizontalAlignment <- Constants.xlLeft
-                // データ長
-                worksheet.Range(Cell (entitem.ItemIndex, 7)).Value2 <- itemref.DataLengthDsp
-                worksheet.Range(Cell (entitem.ItemIndex, 7)).Interior.ColorIndex <- DataAttrColor
-                worksheet.Range(Cell (entitem.ItemIndex, 7)).HorizontalAlignment <- Constants.xlLeft
-                // 入力行
-                worksheet.Range(Cell (entitem.ItemIndex, InputRow)).NumberFormatLocal <- itemref.NumberFormat
-                // セル幅をセット
-                ignore <| worksheet.Range(Column entitem.ItemIndex).EntireColumn.AutoFit()
-                let width = unbox<float> (worksheet.Range(Column entitem.ItemIndex).ColumnWidth)
-                if width < itemref.ColumnWidth
-                then worksheet.Range(Column entitem.ItemIndex).ColumnWidth <- itemref.ColumnWidth
-                else ()
-                // データチェック属性を設定
-                let validation = worksheet.Range(Cell (entitem.ItemIndex, InputRow)).Validation
-                ignore(validation.Delete())
-                ignore <| match (itemref.DataType, entitem.ConditionRef) with
-                            // コンディション定義がある場合、リスト選択
-                            | (_ , Some(cond)) ->
-                                validation.Add(
-                                    XlDVType.xlValidateList
-                                    , XlDVAlertStyle.xlValidAlertStop
-                                    , XlFormatConditionOperator.xlBetween
-                                    , (GetDropDownList cond.ConditionItems))
-                                validation.IMEMode <- int XlIMEMode.xlIMEModeOff
-                            // 数値項目は最小、最大値
-                            | ("NUMBER", None) ->
-                                validation.Add(
-                                    XlDVType.xlValidateDecimal
-                                    , XlDVAlertStyle.xlValidAlertStop
-                                    , XlFormatConditionOperator.xlBetween
-                                    , itemref.NumberFormatMin
-                                    , itemref.NumberFormatMax)
-                                validation.IMEMode <- int XlIMEMode.xlIMEModeOff
-                            // 文字列項目は、バイト数制約（最大値指定の時と、限定の場合がある）
-                            | ("CHAR", None) -> 
-                                validation.Add(
-                                    XlDVType.xlValidateCustom
-                                    , XlDVAlertStyle.xlValidAlertStop
-                                    , XlFormatConditionOperator.xlBetween
-                                    , "=LENB(" + (Cell (entitem.ItemIndex, InputRow)) + ")"
-                                      + itemref.ValidationCusmomOperator
-                                      + (CellRA (entitem.ItemIndex, DataLengthRow)))
-                                validation.IMEMode <- int XlIMEMode.xlIMEModeOff
-                            // 文字列項目は、最大バイト数制約
-                            | ("VARCHAR2", None) ->
-                                validation.Add(
-                                    XlDVType.xlValidateCustom
-                                    , XlDVAlertStyle.xlValidAlertStop
-                                    , XlFormatConditionOperator.xlBetween
-                                    , "=LENB(" + (Cell (entitem.ItemIndex, InputRow)) + ")"
-                                      + itemref.ValidationCusmomOperator
-                                      + (CellRA (entitem.ItemIndex, DataLengthRow)))
-                                validation.IMEMode <- int XlIMEMode.xlIMEModeOn
-                            | _ -> ()
-                // その他属性を設定
-                validation.IgnoreBlank <- true
-                validation.InCellDropdown <- true
-                validation.InputTitle <- ""
-                validation.ErrorTitle <- ""
-                validation.InputMessage <- ""
-                validation.ErrorMessage <- ""
-                validation.ShowInput <- true
-                validation.ShowError <- true
-                // PKEY、NotNull項目は色をつけ、注釈を表示する。
-                match entitem.PkeyIndex with
-                | None ->
-                    match entitem.NotNull with
-                    | "true"
-                    | "TRUE" ->
-                        worksheet.Range(Cell (entitem.ItemIndex, InputRow)).Interior.ColorIndex <- NotNullColor
-                        validation.InputMessage <- "必須項目です。"
-                    | _ -> ()
-                | Some pkeyindex ->
-                    worksheet.Range(Cell (entitem.ItemIndex, InputRow)).Interior.ColorIndex <- PkeyColor
-                    validation.InputMessage <- "キー項目です。"
-    // ヘッダ欄設定
-    worksheet.Range(Cell (1,1)).Value2 <- ent.PhysicalName
-    worksheet.Range(Cell (1,2)).Value2 <- ent.LogicalName
-    worksheet.Range(Cell (1,2)).Value2 <- ent.LogicalName
-    worksheet.Range(Cell (2,1)).Value2 <- "日時"
-    worksheet.Range(Cell (3,1)).Value2 <- "ユーザＩＤ"
-    worksheet.Range(Cell (4,1)).Value2 <- "クライアントＩＰ"
-    worksheet.Range(Cell (5,1)).Value2 <- "アプリサーバＩＰ"
-    worksheet.Range(Cell (6,1)).Value2 <- "プログラムＩＤ"
-    worksheet.Range(Cell (2,2)).Value2 <- "ZPK_DBINFO.GET_DATETIME"
-    worksheet.Range(Cell (3,2)).Value2 <- "SETUP"
-    worksheet.Range(Cell (4,2)).Value2 <- "ZPK_DBINFO.GET_IPADDR"
-    worksheet.Range(Cell (5,2)).Value2 <- "ZPK_DBINFO.GET_IPADDR"
-    worksheet.Range(Cell (6,2)).Value2 <- "SQL"
-    // SQLを組み立てる参照式
-    worksheet.Range(Cell (GetSqlPos ent 0)).Value2 <- (GetUpdateSql ent)
-    // SELECT句、VALUE句をセットする。
-    let offset = 0
-    let mutable idx = offset
-    for entitem in ent.EntityItems.Values do
-        idx <- idx + 1
-        match idx < ent.EntityItems.Count + offset with
-        // | true -> worksheet.Range(Cell (GetColumnPos ent idx)).Value2 <- "=\"" + entitem.PhysicalName + "\" & \",\" & " + Cell (GetColumnPos ent (id
-                  // worksheet.Range(Cell (GetSqlPos ent idx)).Value2 <- "=" + (GetSqlValue entitem) + " & \",\" & " + Cell (GetSqlPos ent (idx + 1)
-        | true -> worksheet.Range(Cell (GetColumnPos ent idx)).Value2 <- "=\"" + entitem.PhysicalName + "\""
-                  worksheet.Range(Cell (GetSqlPos    ent idx)).Value2 <- "="   + CellRA (GetColumnPos ent idx) + " & \"=\" & " + (GetSqlValue entitem) + " & \",\" & " + Cell (GetSqlPos ent (idx + 1))
-        | false -> worksheet.Range(Cell (GetColumnPos ent idx)).Value2 <- "=\"" + entitem.PhysicalName + "\""
-                   worksheet.Range(Cell (GetSqlPos ent idx)).Value2 <- "=" + CellRA (GetColumnPos ent idx) + " & \"=\" & " + (GetSqlValue entitem)
-    // 固定枠を設定
-    ignore <| worksheet.Range(Cell (GetFreezePanesPos ent)).Select()
-    app.ActiveWindow.FreezePanes <- true
-    // ブック保存、終了
-    workbook.SaveAs(outDir + "\\" + ent.PhysicalName + "("+ ent.LogicalName + ")" + ".xls")
-    workbook.Close()
-
+            | Some itemref -> 
+                let size = match itemref.DataType with
+                    | "NUMBER"     -> 1 + itemref.DataLength1 / 2
+                    | "CHAR"
+                    | "VARCHAR2" -> itemref.DataLength1
+                printfn "項目名:%s,データタイプ:%s,全体桁数:%d,サイズ:%d" itemref.PhysicalName itemref.DataType itemref.DataLength1 size
+                if objTbl.ContainsKey(inditem.Value.IdxPhysicalName)
+                then
+                    let (idxType, colCount, initSize) = objTbl.[inditem.Value.IdxPhysicalName]
+                    objTbl.[inditem.Value.IdxPhysicalName] <- (idxType , colCount + 1, initSize + size)
+                else
+                    objTbl.Add(inditem.Value.IdxPhysicalName, (inditem.Value.IdxType, 1, size)) 
+        else ()
+    for obj in objTbl do
+        row <- row + 1
+        indexCount <- indexCount + 1
+        let (idxType, colCount, initSize) = obj.Value
+        if idxType = "PK"
+        then ()
+        else indexCountWithoutPK <- indexCountWithoutPK + 1
+        let numStr = match indexCount with
+                       | 1 -> "①"
+                       | 2 -> "②"
+                       | 3 -> "③"
+                       | 4 -> "④"
+                       | 5 -> "⑤"
+                       | 6 -> "⑥"
+                       | 7 -> "⑦"
+                       | 8 -> "⑧"
+                       | 9 -> "⑨"
+                       | 10 -> "⑩"
+                       | 11 -> "⑪"
+                       | 12 -> "⑫"
+                       | 13 -> "⑬"
+                       | 14 -> "⑭"
+                       | 15 -> "⑮"
+                       | 16 -> "⑯"
+                       | 17 -> "⑰"
+                       | 18 -> "⑱"
+                       | 19 -> "⑲"
+                       | 20 -> "⑳"
+                       | _ -> "○"
+        let suffix = if indexCountWithoutPK < 10
+                     then "0" + (string indexCountWithoutPK)
+                     else (string indexCountWithoutPK)
+        let indexPhysicalName = if idxType = "PK"
+                                then "PK_" + ent.PhysicalName
+                                else 
+                                     "IX_" + ent.PhysicalName + suffix
+        worksheet.Range(Cell (1, row)).Value2 <- ent.PhysicalName
+        worksheet.Range(Cell (2, row)).Value2 <- string totalSize
+        worksheet.Range(Cell (3, row)).Value2 <- numStr
+        worksheet.Range(Cell (4, row)).Value2 <- indexPhysicalName
+        worksheet.Range(Cell (5, row)).Value2 <- string colCount
+        worksheet.Range(Cell (6, row)).Value2 <- string initSize
+    if row = initRow
+    then
+        row <- row + 1
+        worksheet.Range(Cell (1, row)).Value2 <- ent.PhysicalName
+        worksheet.Range(Cell (2, row)).Value2 <- string totalSize
+    else ()
+    row
 
 // エントリーポイント
 #if COMPILED
@@ -378,21 +340,35 @@ let main (args:string[]) =
     match GetEntityIndex csvDir with
     | None -> -1
     | Some dicEntityIndex -> 
+    match GetIndex csvDir with
+    | None -> -1
+    | Some dicIndex -> 
     ProcessConditionItem dicConditionItem dicCondition
     ProcessItem dicItem dicCondition
     ProcessEntityItem dicEntityItem dicEntityIndex dicItem dicCondition dicEntity
+    ProcessIndexItem  dicIndex dicItem
     ReNumberEntityItem dicEntity
     let app = new ApplicationClass(Visible = false) 
     app.DisplayAlerts <- false
     ignore <| MakeDirectory outDir
+    // Excel作成
+    let workbooks = app.Workbooks
+    let workbook = workbooks.Add(XlWBATemplate.xlWBATWorksheet) 
+    let sheets = workbook.Worksheets 
+    let worksheet = (sheets.[box 1] :?> _Worksheet)
+    let mutable row = 0
+    worksheet.Name <- "初期サイズ計算"
     for ent in dicEntity.Values do
         match (IsTarget ent) with
         | true ->
             printfn "エンティティ[%s]を処理中…" ent.PhysicalName
-            CreateExcel app ent outDir
+            row <- WriteExcel worksheet ent dicIndex row
         | false ->
             printfn "エンティティ[%s]をスキップしました。" ent.PhysicalName
-    // Excel終了
+    // app.ActiveWindow.FreezePanes <- true
+    // ブック保存、終了
+    workbook.SaveAs(outDir + "\\" + "CalcInitialSize.xls")
+    workbook.Close()
     app.UserControl <- false
     app.Quit()
     0
